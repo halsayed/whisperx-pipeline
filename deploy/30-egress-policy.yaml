@@ -1,0 +1,24 @@
+# Optional: lets the transcription pods talk only to cluster DNS and the S3
+# endpoint. On a connected cluster this proves the worker runs with no
+# internet access (as it will in an air-gapped site). Set the CIDR to the IP
+# of your S3 endpoint.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: whisperx-transcribe-egress
+  namespace: whisperx
+spec:
+  podSelector:
+    matchLabels: { app: whisperx-transcribe }
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: kube-system }
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+    - to:
+        - ipBlock: { cidr: 192.0.2.10/32 }
+      ports:
+        - { protocol: TCP, port: 443 }

@@ -1,0 +1,43 @@
+# Namespace + static NFS volume for the WhisperX model cache.
+#
+# The share is pre-created on the file server (it is NOT dynamically
+# provisioned), so the PV points straight at the export and the PVC binds to
+# it by name. storageClassName is "" on both so no provisioner gets involved.
+#
+# Change `server` and `path` for another environment.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: whisperx
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: whisperx-voice-models
+spec:
+  capacity:
+    storage: 50Gi            # informational for NFS; the share's own quota applies
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain   # never delete the share's contents
+  storageClassName: ""
+  mountOptions:
+    - nfsvers=4
+    - hard
+  nfs:
+    server: nfs.example.com   # NFS server name or IP
+    path: /voice-models
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: voice-models
+  namespace: whisperx
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  volumeName: whisperx-voice-models
+  resources:
+    requests:
+      storage: 50Gi

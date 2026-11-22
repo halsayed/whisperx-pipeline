@@ -1,0 +1,44 @@
+# Builds the worker image inside the cluster with kaniko and pushes it to the
+# lab registry. The build context is the ConfigMap `worker-src`, created from
+# the worker/ folder (see README.md). Needs internet access (PyPI, Debian,
+# Docker Hub, gcr.io). On a machine with Docker, `docker build worker/` gives
+# the same image.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: worker-build
+  namespace: whisperx
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      restartPolicy: Never
+      initContainers:
+        # ConfigMap files are symlinks; copy real files into the build context.
+        - name: context
+          image: python:3.12-slim
+          command: ["sh", "-c", "cp -L /src/* /workspace/ && ls -la /workspace"]
+          volumeMounts:
+            - { name: src, mountPath: /src }
+            - { name: workspace, mountPath: /workspace }
+      containers:
+        - name: kaniko
+          image: gcr.io/kaniko-project/executor:v1.23.2
+          args:
+            - --context=dir:///workspace
+            - --dockerfile=/workspace/Dockerfile
+            - --destination=lab-registry.whisperx.svc.cluster.local:5000/whisperx-worker:3.7.9-1
+            - --insecure
+            - --snapshot-mode=redo
+            - --compressed-caching=false
+            - --single-snapshot
+          resources:
+            requests: { cpu: "2", memory: 8Gi, ephemeral-storage: 30Gi }
+            limits: { memory: 20Gi }
+          volumeMounts: [{ name: workspace, mountPath: /workspace }]
+      volumes:
+        - name: src
+          configMap: { name: worker-src }
+        - name: workspace
+          emptyDir: {}

@@ -1,0 +1,26 @@
+# Pipeline settings. S3 keys are NOT here: they live in the Secret
+# `s3-credentials` (see README.md).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: whisperx-config
+  namespace: whisperx
+data:
+  # --- object storage (any S3-compatible endpoint) ---
+  S3_ENDPOINT_URL: "https://s3.example.com"
+  S3_VERIFY_SSL: "true"          # "false" for self-signed certificates
+  AWS_DEFAULT_REGION: "us-east-1"
+  INPUT_BUCKET: "voice-recordings"
+  INPUT_PREFIX: "in/"
+  OUTPUT_BUCKET: "voice-recordings"  # may be a different bucket
+  OUTPUT_PREFIX: "out/"
+
+  # --- transcription ---
+  WHISPER_MODEL: "large-v3"      # or "large-v3-turbo" (faster, slightly less accurate)
+  COMPUTE_TYPE: "float16"        # "int8_float16" for GPUs with 8 GB or less
+  BATCH_SIZE: "16"               # lower (4) for small GPUs
+  LANGUAGE: ""                   # "ar" / "en" to force; empty = detect per file
+  DIARIZE: "true"
+  MIN_SPEAKERS: ""               # optional hints for diarization
+  MAX_SPEAKERS: ""
+  OVERWRITE: "false"             # "true" re-processes files that already have output

@@ -1,0 +1,55 @@
+# One batch run: transcribes every audio file under INPUT_PREFIX that has no
+# output yet, then exits. Start a run with `kubectl create -f` (not apply),
+# because the Job uses generateName so every run gets its own name and log.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: whisperx-transcribe-
+  namespace: whisperx
+  labels: { app: whisperx-transcribe }
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 604800     # keep finished runs (and logs) for a week
+  template:
+    metadata:
+      labels: { app: whisperx-transcribe }
+    spec:
+      restartPolicy: Never
+      # Pick the GPU model to run on. Remove to let the scheduler choose.
+      nodeSelector:
+        nvidia.com/gpu.product: NVIDIA-RTX-A6000
+      tolerations:
+        - { key: nvidia.com/gpu, operator: Exists }
+      # Only needed when cluster DNS cannot resolve the S3 host name (the case
+      # in the test lab). Uncomment and set the IP and name of your endpoint.
+      # hostAliases:
+      #   - ip: 192.0.2.10
+      #     hostnames: [s3.example.com]
+      # Only needed for a private registry (see README step 2). Harmless if
+      # the image is public or the Secret does not exist.
+      imagePullSecrets:
+        - name: dockerhub-pull
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+      containers:
+        - name: worker
+          # Set this to your own build (README step 2). The author's build
+          # below is in a private Docker Hub repository. For the in-cluster
+          # lab registry use localhost:30500/whisperx-worker:3.7.9-1.
+          image: docker.io/aksiio/whisperx-worker:3.7.9-1
+          envFrom:
+            - configMapRef: { name: whisperx-config }
+            - secretRef: { name: s3-credentials }
+          resources:
+            requests: { cpu: "4", memory: 12Gi }
+            limits: { nvidia.com/gpu: 1, memory: 24Gi }
+          volumeMounts:
+            - { name: models, mountPath: /models, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: models
+          persistentVolumeClaim: { claimName: voice-models, readOnly: true }
+        - name: tmp
+          emptyDir: {}
